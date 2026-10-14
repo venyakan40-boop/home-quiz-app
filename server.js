@@ -52,6 +52,7 @@ io.on('connection', (socket) => {
     currentTeamId = teamId;
     
     socket.join(roomCode);
+    socket.join(teamId); // ИСПРАВЛЕНИЕ: присоединяем к комнате team.id
     callback({ success: true, roomCode, teamId, isAdmin: true });
   });
 
@@ -75,6 +76,7 @@ io.on('connection', (socket) => {
     currentTeamId = teamId;
     
     socket.join(roomCode);
+    socket.join(teamId); // ИСПРАВЛЕНИЕ: присоединяем к комнате team.id
     io.to(roomCode).emit('playerJoined', { teams: room.teams });
     callback({ success: true, teamId, isAdmin: false });
   });
