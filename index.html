@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Домашний Квиз</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 15px;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 25px;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    h1 { color: #333; margin-bottom: 25px; text-align: center; font-size: 26px; }
+    h2 { color: #555; margin-bottom: 20px; font-size: 20px; text-align: center; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    input, button {
+      width: 100%;
+      padding: 14px;
+      margin-bottom: 12px;
+      border-radius: 10px;
+      border: 2px solid #e0e0e0;
+      font-size: 16px;
+    }
+    input:focus { outline: none; border-color: #667eea; }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+      transition: transform 0.1s;
+    }
+    button:active { transform: scale(0.98); }
+    .btn-secondary { background: #f0f0f0; color: #333; }
+    .team-list { list-style: none; margin: 15px 0; }
+    .team-list li {
+      padding: 12px;
+      background: #f8f9fa;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 16px;
+    }
+    .admin-badge { font-size: 20px; }
+    .answer-input { margin-bottom: 15px; }
+    .answer-input label { display: block; margin-bottom: 6px; color: #555; font-weight: 500; }
+    .check-item { background: #f8f9fa; padding: 15px; margin-bottom: 12px; border-radius: 10px; }
+    .check-item .answer-text { margin-bottom: 10px; color: #333; font-size: 15px; word-break: break-word; }
+    .check-buttons { display: flex; gap: 10px; }
+    .check-buttons button { flex: 1; margin-bottom: 0; padding: 10px; font-size: 14px; }
+    .btn-correct { background: #4caf50; }
+    .btn-incorrect { background: #f44336; }
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 14px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e0e0e0; }
+    th { background: #f8f9fa; font-weight: bold; color: #555; }
+    tr:first-child td { font-weight: bold; color: #667eea; }
+    .info-text { text-align: center; color: #777; margin: 15px 0; font-size: 15px; }
+    .settings-group { margin-bottom: 15px; }
+    .settings-group label { display: block; margin-bottom: 6px; color: #555; font-weight: 500; }
+    .error { color: #f44336; text-align: center; margin-bottom: 10px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Главный экран -->
+    <div id="home-screen" class="screen active">
+      <h1>🧠 Домашний Квиз</h1>
+      <button onclick="showScreen('create-screen')">Создать игру</button>
+      <button class="btn-secondary" onclick="showScreen('join-screen')">Присоединиться к игре</button>
+    </div>
+
+    <!-- Экран создания -->
+    <div id="create-screen" class="screen">
+      <h2>Создание новой игры</h2>
+      <div id="create-error" class="error"></div>
+      <input type="text" id="create-team-name" placeholder="Название вашей команды">
+      <button onclick="createRoom()">Создать комнату</button>
+      <button class="btn-secondary" onclick="showScreen('home-screen')">Назад</button>
+    </div>
+
+    <!-- Экран входа -->
+    <div id="join-screen" class="screen">
+      <h2>Вход в игру</h2>
+      <div id="join-error" class="error"></div>
+      <input type="text" id="join-room-code" placeholder="Код комнаты (например, ABC123)">
+      <input type="text" id="join-team-name" placeholder="Название вашей команды">
+      <button onclick="joinRoom()">Войти</button>
+      <button class="btn-secondary" onclick="showScreen('home-screen')">Назад</button>
+    </div>
+
+    <!-- Лобби -->
+    <div id="lobby-screen" class="screen">
+      <h2>Комната: <span id="lobby-room-code"></span></h2>
+      <div id="lobby-settings" style="display: none;">
+        <div class="settings-group">
+          <label>Количество вопросов</label>
+          <input type="number" id="settings-questions" value="5" min="1">
+        </div>
+        <div class="settings-group">
+          <label>Баллов за правильный ответ</label>
+          <input type="number" id="settings-points" value="10" min="1">
+        </div>
+        <button onclick="startRound()">Начать раунд</button>
+      </div>
+      <div id="lobby-waiting" style="display: none;">
+        <p class="info-text">Ожидание начала раунда...</p>
+      </div>
+      <h3 style="margin-top: 20px; font-size: 16px; color: #555;">Команды в игре:</h3>
+      <ul id="lobby-teams" class="team-list"></ul>
+    </div>
+
+    <!-- Экран ввода ответов -->
+    <div id="input-screen" class="screen">
+      <h2>Раунд <span id="input-round-number"></span></h2>
+      <p class="info-text">Введите ответы</p>
+      <div id="input-answers"></div>
+      <button onclick="submitAnswers()">Отправить ответы</button>
+    </div>
+
+    <!-- Ожидание -->
+    <div id="waiting-screen" class="screen">
+      <h2>Ответы отправлены!</h2>
+      <p class="info-text">Ожидание остальных команд...</p>
+      <p id="waiting-progress" class="info-text" style="font-weight: bold; color: #667eea;"></p>
+    </div>
+
+    <!-- Экран проверки -->
+    <div id="check-screen" class="screen">
+      <h2>Проверка ответов</h2>
+      <p class="info-text">Вы проверяете команду: <strong id="check-team-name"></strong></p>
+      <div id="check-answers"></div>
+      <button onclick="submitChecks()">Завершить проверку</button>
+    </div>
+
+    <!-- Экран результатов -->
+    <div id="results-screen" class="screen">
+      <h2>Результаты раунда <span id="results-round-number"></span></h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Место</th>
+            <th>Команда</th>
+            <th>Раунд</th>
+            <th>Итого</th>
+          </tr>
+        </thead>
+        <tbody id="results-table"></tbody>
+      </table>
+      <div id="results-admin-buttons" style="display: none;">
+        <button onclick="nextRound()">Следующий раунд</button>
+        <button class="btn-secondary" onclick="endGame()">Завершить игру</button>
+      </div>
+      <div id="results-waiting" style="display: none;">
+        <p class="info-text">Ожидание решения администратора...</p>
+      </div>
+    </div>
+
+    <!-- Финальный экран -->
+    <div id="final-screen" class="screen">
+      <h1>🏆 Игра окончена!</h1>
+      <h2>Финальные результаты</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Место</th>
+            <th>Команда</th>
+            <th>Итого</th>
+          </tr>
+        </thead>
+        <tbody id="final-table"></tbody>
+      </table>
+      <button onclick="location.reload()">Вернуться на главную</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let myTeamId = null;
+    let isAdmin = false;
+    let currentChecks = [];
+
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+    }
+
+    function createRoom() {
+      const teamName = document.getElementById('create-team-name').value.trim();
+      if (!teamName) { document.getElementById('create-error').textContent = 'Введите название команды'; return; }
+      socket.emit('createRoom', teamName, (response) => {
+        if (response.success) {
+          myTeamId = response.teamId;
+          isAdmin = true;
+          document.getElementById('lobby-room-code').textContent = response.roomCode;
+          document.getElementById('lobby-settings').style.display = 'block';
+          document.getElementById('lobby-waiting').style.display = 'none';
+          showScreen('lobby-screen');
+        } else {
+          document.getElementById('create-error').textContent = response.error;
+        }
+      });
+    }
+
+    function joinRoom() {
+      const roomCode = document.getElementById('join-room-code').value.trim().toUpperCase();
+      const teamName = document.getElementById('join-team-name').value.trim();
+      if (!roomCode || !teamName) { document.getElementById('join-error').textContent = 'Заполните все поля'; return; }
+      socket.emit('joinRoom', { roomCode, teamName }, (response) => {
+        if (response.success) {
+          myTeamId = response.teamId;
+          isAdmin = false;
+          document.getElementById('lobby-room-code').textContent = roomCode;
+          document.getElementById('lobby-settings').style.display = 'none';
+          document.getElementById('lobby-waiting').style.display = 'block';
+          showScreen('lobby-screen');
+        } else {
+          document.getElementById('join-error').textContent = response.error;
+        }
+      });
+    }
+
+    document.getElementById('settings-questions').addEventListener('change', (e) => {
+      socket.emit('updateRoundSettings', { questionsCount: parseInt(e.target.value), pointsPerQuestion: parseInt(document.getElementById('settings-points').value) });
+    });
+    document.getElementById('settings-points').addEventListener('change', (e) => {
+      socket.emit('updateRoundSettings', { questionsCount: parseInt(document.getElementById('settings-questions').value), pointsPerQuestion: parseInt(e.target.value) });
+    });
+
+    function startRound() { socket.emit('startRound'); }
+    function submitAnswers() {
+      const answers = [];
+      document.querySelectorAll('#input-answers input').forEach(input => answers.push(input.value.trim()));
+      socket.emit('submitAnswers', answers);
+      showScreen('waiting-screen');
+    }
+    function submitChecks() {
+      socket.emit('submitChecks', currentChecks);
+      showScreen('waiting-screen');
+    }
+    function nextRound() { socket.emit('nextRound'); }
+    function endGame() { socket.emit('endGame'); }
+
+    function updateTeamsList(teams) {
+      const list = document.getElementById('lobby-teams');
+      list.innerHTML = '';
+      teams.forEach(team => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${team.name}</span>${team.id === myTeamId && isAdmin ? '<span class="admin-badge">👑</span>' : ''}`;
+        list.appendChild(li);
+      });
+    }
+
+    socket.on('playerJoined', ({ teams }) => updateTeamsList(teams));
+    socket.on('playerLeft', ({ teams }) => updateTeamsList(teams));
+    socket.on('roundSettingsUpdated', (settings) => {
+      document.getElementById('settings-questions').value = settings.questionsCount;
+      document.getElementById('settings-points').value = settings.pointsPerQuestion;
+    });
+
+    socket.on('roundStarted', ({ roundNumber, questionsCount }) => {
+      document.getElementById('input-round-number').textContent = roundNumber;
+      const container = document.getElementById('input-answers');
+      container.innerHTML = '';
+      for (let i = 1; i <= questionsCount; i++) {
+        const div = document.createElement('div');
+        div.className = 'answer-input';
+        div.innerHTML = `<label>Вопрос ${i}:</label><input type="text" placeholder="Ваш ответ">`;
+        container.appendChild(div);
+      }
+      showScreen('input-screen');
+    });
+
+    socket.on('progressUpdate', ({ submitted, total }) => {
+      document.getElementById('waiting-progress').textContent = `Сдали ответы: ${submitted} из ${total}`;
+    });
+
+    socket.on('startChecking', ({ teamName, answers }) => {
+      document.getElementById('check-team-name').textContent = teamName;
+      const container = document.getElementById('check-answers');
+      container.innerHTML = '';
+      currentChecks = [];
+      answers.forEach((answer, index) => {
+        currentChecks.push(0);
+        const div = document.createElement('div');
+        div.className = 'check-item';
+        div.innerHTML = `
+          <div class="answer-text"><strong>Вопрос ${index + 1}:</strong> ${answer || '(нет ответа)'}</div>
+          <div class="check-buttons">
+            <button class="btn-correct" onclick="markAnswer(${index}, 1, this)">Верно</button>
+            <button class="btn-incorrect" onclick="markAnswer(${index}, 0, this)">Неверно</button>
+          </div>`;
+        container.appendChild(div);
+      });
+      showScreen('check-screen');
+    });
+
+    function markAnswer(index, value, button) {
+      currentChecks[index] = value;
+      const buttons = button.parentElement.querySelectorAll('button');
+      buttons.forEach(btn => btn.style.opacity = '0.4');
+      button.style.opacity = '1';
+    }
+
+    socket.on('showResults', ({ teams, roundNumber }) => {
+      document.getElementById('results-round-number').textContent = roundNumber;
+      const sortedTeams = [...teams].sort((a, b) => b.score - a.score);
+      const tbody = document.getElementById('results-table');
+      tbody.innerHTML = '';
+      sortedTeams.forEach((team, index) => {
+        const lastRoundScore = team.roundScores[team.roundScores.length - 1] || 0;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${index + 1}</td><td>${team.name} ${team.id === myTeamId && isAdmin ? '👑' : ''}</td><td>${lastRoundScore}</td><td>${team.score}</td>`;
+        tbody.appendChild(tr);
+      });
+      if (isAdmin) {
+        document.getElementById('results-admin-buttons').style.display = 'block';
+        document.getElementById('results-waiting').style.display = 'none';
+      } else {
+        document.getElementById('results-admin-buttons').style.display = 'none';
+        document.getElementById('results-waiting').style.display = 'block';
+      }
+      showScreen('results-screen');
+    });
+
+    socket.on('nextRound', ({ teams }) => {
+      updateTeamsList(teams);
+      document.getElementById('lobby-settings').style.display = isAdmin ? 'block' : 'none';
+      document.getElementById('lobby-waiting').style.display = isAdmin ? 'none' : 'block';
+      showScreen('lobby-screen');
+    });
+
+    socket.on('gameEnded', ({ teams }) => {
+      const sortedTeams = [...teams].sort((a, b) => b.score - a.score);
+      const tbody = document.getElementById('final-table');
+      tbody.innerHTML = '';
+      sortedTeams.forEach((team, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${index + 1}</td><td>${team.name} ${team.id === myTeamId && isAdmin ? '👑' : ''}</td><td>${team.score}</td>`;
+        tbody.appendChild(tr);
+      });
+      showScreen('final-screen');
+    });
+  </script>
+</body>
+</html>
