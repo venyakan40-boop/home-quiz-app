@@ -66,10 +66,10 @@
     .check-buttons button { flex: 1; margin-bottom: 0; padding: 10px; font-size: 14px; }
     .btn-correct { background: #4caf50; }
     .btn-incorrect { background: #f44336; }
-    table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 14px; }
-    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e0e0e0; }
-    th { background: #f8f9fa; font-weight: bold; color: #555; }
-    tr:first-child td { font-weight: bold; color: #667eea; }
+    table {width: 100%;  border-collapse: collapse; margin: 15px 0; font-size: 13px; table-layout: auto;}
+    th, td {padding: 8px 6px; text-align: center; border-bottom: 1px solid #e0e0e0; white-space: nowrap;}
+    th:first-child, td:first-child { text-align: center; width: 40px;}
+    th:nth-child(2), td:nth-child(2) { text-align: left;}
     .info-text { text-align: center; color: #777; margin: 15px 0; font-size: 15px; }
     .settings-group { margin-bottom: 15px; }
     .settings-group label { display: block; margin-bottom: 6px; color: #555; font-weight: 500; }
@@ -318,26 +318,63 @@
       button.style.opacity = '1';
     }
 
-    socket.on('showResults', ({ teams, roundNumber }) => {
-      document.getElementById('results-round-number').textContent = roundNumber;
-      const sortedTeams = [...teams].sort((a, b) => b.score - a.score);
-      const tbody = document.getElementById('results-table');
-      tbody.innerHTML = '';
-      sortedTeams.forEach((team, index) => {
-        const lastRoundScore = team.roundScores[team.roundScores.length - 1] || 0;
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${index + 1}</td><td>${team.name} ${team.id === myTeamId && isAdmin ? '👑' : ''}</td><td>${lastRoundScore}</td><td>${team.score}</td>`;
-        tbody.appendChild(tr);
-      });
-      if (isAdmin) {
-        document.getElementById('results-admin-buttons').style.display = 'block';
-        document.getElementById('results-waiting').style.display = 'none';
-      } else {
-        document.getElementById('results-admin-buttons').style.display = 'none';
-        document.getElementById('results-waiting').style.display = 'block';
-      }
-      showScreen('results-screen');
-    });
+  socket.on('showResults', ({ teams, roundNumber }) => {
+  document.getElementById('results-round-number').textContent = roundNumber;
+  
+  // Сортировка с учётом tie-breaker
+  const sortedTeams = [...teams].sort((a, b) => {
+    // Сначала сравниваем общий счёт
+    if (b.score !== a.score) return b.score - a.score;
+    // Если равенство — сравниваем раунды с конца (последний раунд важнее)
+    for (let i = a.roundScores.length - 1; i >= 0; i--) {
+      const aScore = a.roundScores[i] || 0;
+      const bScore = b.roundScores[i] || 0;
+      if (aScore !== bScore) return bScore - aScore;
+    }
+    return 0;
+  });
+  
+  const table = document.querySelector('#results-screen table');
+  const thead = table.querySelector('thead');
+  const tbody = document.getElementById('results-table');
+  
+  // Формируем заголовки таблицы динамически
+  let headerHtml = '<tr><th>Место</th><th>Команда</th>';
+  for (let i = 1; i <= roundNumber; i++) {
+    headerHtml += `<th>Р${i}</th>`;
+  }
+  headerHtml += '<th>Итого</th></tr>';
+  thead.innerHTML = headerHtml;
+  
+  // Заполняем строки
+  tbody.innerHTML = '';
+  sortedTeams.forEach((team, index) => {
+    const tr = document.createElement('tr');
+    let rowHtml = `<td>${index + 1}</td>`;
+    rowHtml += `<td>${team.name} ${team.id === myTeamId && isAdmin ? '👑' : ''}</td>`;
+    
+    // Выводим баллы за каждый раунд
+    for (let i = 0; i < roundNumber; i++) {
+      const roundScore = team.roundScores[i] || 0;
+      rowHtml += `<td>${roundScore}</td>`;
+    }
+    
+    // Итоговый счёт
+    rowHtml += `<td><strong>${team.score}</strong></td>`;
+    tr.innerHTML = rowHtml;
+    tbody.appendChild(tr);
+  });
+  
+  if (isAdmin) {
+    document.getElementById('results-admin-buttons').style.display = 'block';
+    document.getElementById('results-waiting').style.display = 'none';
+  } else {
+    document.getElementById('results-admin-buttons').style.display = 'none';
+    document.getElementById('results-waiting').style.display = 'block';
+  }
+  
+  showScreen('results-screen');
+  });
 
     socket.on('nextRound', ({ teams }) => {
       updateTeamsList(teams);
@@ -346,17 +383,46 @@
       showScreen('lobby-screen');
     });
 
-    socket.on('gameEnded', ({ teams }) => {
-      const sortedTeams = [...teams].sort((a, b) => b.score - a.score);
-      const tbody = document.getElementById('final-table');
-      tbody.innerHTML = '';
-      sortedTeams.forEach((team, index) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${index + 1}</td><td>${team.name} ${team.id === myTeamId && isAdmin ? '👑' : ''}</td><td>${team.score}</td>`;
-        tbody.appendChild(tr);
-      });
-      showScreen('final-screen');
+  socket.on('gameEnded', ({ teams }) => {
+  const sortedTeams = [...teams].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    for (let i = a.roundScores.length - 1; i >= 0; i--) {
+      const aScore = a.roundScores[i] || 0;
+      const bScore = b.roundScores[i] || 0;
+      if (aScore !== bScore) return bScore - aScore;
+    }
+    return 0;
+  });
+  
+  const table = document.querySelector('#final-screen table');
+  const thead = table.querySelector('thead');
+  const tbody = document.getElementById('final-table');
+  
+  // Заголовки финальной таблицы
+  let headerHtml = '<tr><th>Место</th><th>Команда</th>';
+  for (let i = 1; i <= sortedTeams[0]?.roundScores.length; i++) {
+    headerHtml += `<th>Р${i}</th>`;
+  }
+  headerHtml += '<th>Итого</th></tr>';
+  thead.innerHTML = headerHtml;
+  
+  tbody.innerHTML = '';
+  sortedTeams.forEach((team, index) => {
+    const tr = document.createElement('tr');
+    let rowHtml = `<td>${index + 1}</td>`;
+    rowHtml += `<td>${team.name} ${team.id === myTeamId && isAdmin ? '👑' : ''}</td>`;
+    
+    team.roundScores.forEach(score => {
+      rowHtml += `<td>${score}</td>`;
     });
+    
+    rowHtml += `<td><strong>${team.score}</strong></td>`;
+    tr.innerHTML = rowHtml;
+    tbody.appendChild(tr);
+  });
+  
+  showScreen('final-screen');
+});
   </script>
 </body>
 </html>
